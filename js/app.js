@@ -35,6 +35,7 @@
       state.viewYear = now.getFullYear();
       state.viewMonth = now.getMonth();
       state.selectedDate = formatDateKey(now);
+      document.body.classList.add('calendar-active');
 
       // Request persistent storage (C7/C8)
       requestPersistentStorage();
@@ -120,7 +121,7 @@
       `;
     } else {
       // Check missing days
-      const missing = await getMissingDays(3);
+        const missing = await getMissingDays();
       if (missing.length > 0) {
         cls = 'missing';
         html = `
@@ -155,6 +156,7 @@
     document.querySelectorAll('.tab-item').forEach((item) => {
       item.classList.toggle('active', item.dataset.tab === tabName);
     });
+    document.body.classList.toggle('calendar-active', tabName === 'calendar');
   }
 
   /* ============================================================
@@ -240,10 +242,17 @@
       body.appendChild(cell);
     }
 
+    // Keep six rows so the calendar height stays stable across months.
+    while (body.children.length < 42) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell empty';
+      body.appendChild(cell);
+    }
+
     // Update summary
     await updateSummary(periodKey);
 
-    // Update day edit card
+    // Populate the day edit sheet for the currently selected date.
     await renderDayEditCard();
   }
 
@@ -263,6 +272,7 @@
       c.classList.toggle('selected', c.dataset.date === dateKey);
     });
     await renderDayEditCard();
+    openDayEditSheet();
   }
 
   async function renderDayEditCard() {
@@ -288,19 +298,11 @@
     const wage = hours * rate;
     $('dayEditWage').textContent = `¥${wage.toFixed(2)}`;
 
-    // Tags
-    const tags = record ? record.tags : [];
-    $('tagOvertime').classList.toggle('active', tags.includes('加班'));
-    $('tagCompoff').classList.toggle('active', tags.includes('调休'));
-
     // Rest toggle
     const isRest = record ? record.isRest : false;
     const restBtn = $('restToggle');
     restBtn.classList.toggle('active', isRest);
     $('restToggleText').textContent = isRest ? '已标记为休息日' : '标记为休息日';
-
-    // Note
-    $('noteInput').value = record ? (record.note || '') : '';
 
     // Delete button
     $('deleteRecordBtn').classList.toggle('hidden', !record);
@@ -322,12 +324,11 @@
     if (isRest) {
       // Rest day: hours=0
       const record = {
+        ...existing,
         date: dateKey,
         hours: 0,
-        rate: state.settings.hourlyRate,
+        rate: existing && existing.rate ? existing.rate : state.settings.hourlyRate,
         isRest: true,
-        tags: [],
-        note: $('noteInput').value.trim(),
         createdAt: existing ? existing.createdAt : undefined
       };
       await saveWorkRecord(record);
@@ -335,7 +336,7 @@
       await renderCalendar();
       await checkReminders();
       await renderWageTab();
-      return;
+      return true;
     }
 
     // Parse hours
@@ -345,7 +346,7 @@
     // Validate
     if (isNaN(hours) || hours < 0 || hours > 24) {
       $('hoursError').classList.remove('hidden');
-      return;
+      return false;
     }
 
     // Round to 0.1
@@ -356,7 +357,7 @@
       $('dayEditWage').textContent = '¥0.00';
       await renderCalendar();
       await checkReminders();
-      return;
+      return true;
     }
 
     // If hours=0 and existing record → delete record (turn to missing/rest)
@@ -366,24 +367,18 @@
       await renderDayEditCard();
       await renderCalendar();
       await checkReminders();
-      return;
+      return true;
     }
-
-    // Get tags from UI
-    const tags = [];
-    if ($('tagOvertime').classList.contains('active')) tags.push('加班');
-    if ($('tagCompoff').classList.contains('active')) tags.push('调休');
 
     // Rate snapshot: use existing record's rate, or current settings rate for new records
     const rate = existing && existing.rate ? existing.rate : state.settings.hourlyRate;
 
     const record = {
+      ...existing,
       date: dateKey,
       hours: roundedHours,
       rate: rate,
       isRest: false,
-      tags: tags,
-      note: $('noteInput').value.trim(),
       createdAt: existing ? existing.createdAt : undefined
     };
 
@@ -397,6 +392,7 @@
     await renderCalendar();
     await checkReminders();
     await renderWageTab();
+    return true;
   }
 
   /* ===== C1: Toggle Rest ===== */
@@ -407,14 +403,7 @@
     $('restToggleText').textContent = isRest ? '已标记为休息日' : '标记为休息日';
     $('hoursInput').disabled = isRest;
     $('hoursInput').value = isRest ? '' : ($('hoursInput').value);
-    await saveCurrentRecord();
-  }
-
-  /* ===== C1: Toggle Tag ===== */
-  async function toggleTag(tagName) {
-    const btn = tagName === '加班' ? $('tagOvertime') : $('tagCompoff');
-    btn.classList.toggle('active');
-    await saveCurrentRecord();
+    updateDayEditWage();
   }
 
   /* ===== C1: Step Hours ===== */
@@ -424,8 +413,7 @@
     val = Math.round((val + delta) * 10) / 10;
     val = Math.max(0, Math.min(24, val));
     input.value = val.toFixed(1);
-    // Trigger save
-    saveCurrentRecord();
+    updateDayEditWage();
   }
 
   /* ===== C1: Quick Set Hours ===== */
@@ -435,7 +423,17 @@
     } else {
       $('hoursInput').value = hours.toFixed(1);
     }
-    saveCurrentRecord();
+    updateDayEditWage();
+  }
+
+  function updateDayEditWage() {
+    const hours = $('restToggle').classList.contains('active')
+      ? 0
+      : parseFloat($('hoursInput').value) || 0;
+    const rate = state.selectedRecord && state.selectedRecord.rate
+      ? state.selectedRecord.rate
+      : state.settings.hourlyRate;
+    $('dayEditWage').textContent = `¥${(hours * rate).toFixed(2)}`;
   }
 
   /* ===== C1: Delete Record ===== */
@@ -448,6 +446,27 @@
     await checkReminders();
     await renderWageTab();
     showToast('记录已删除');
+    closeDayEditSheet();
+  }
+
+  function openDayEditSheet() {
+    const sheet = $('dayEditSheet');
+    sheet.classList.remove('hidden');
+    sheet.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeDayEditSheet() {
+    const sheet = $('dayEditSheet');
+    sheet.classList.add('hidden');
+    sheet.setAttribute('aria-hidden', 'true');
+  }
+
+  async function saveAndCloseDayEditSheet() {
+    const saved = await saveCurrentRecord();
+    if (saved) {
+      closeDayEditSheet();
+      showToast('记录已保存');
+    }
   }
 
   /* ============================================================
@@ -794,11 +813,11 @@
     $('hoursMinus').addEventListener('click', () => stepHours(-0.1));
     $('hoursPlus').addEventListener('click', () => stepHours(0.1));
 
-    // Hours input — auto-save on blur + validate
-    $('hoursInput').addEventListener('blur', saveCurrentRecord);
+    // Hours input — validate and save explicitly.
+    $('hoursInput').addEventListener('input', updateDayEditWage);
     $('hoursInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        e.target.blur();
+        saveAndCloseDayEditSheet();
       }
     });
 
@@ -810,15 +829,12 @@
       });
     });
 
-    // Tags
-    $('tagOvertime').addEventListener('click', () => toggleTag('加班'));
-    $('tagCompoff').addEventListener('click', () => toggleTag('调休'));
-
     // Rest toggle
     $('restToggle').addEventListener('click', toggleRest);
 
-    // Note — auto-save on blur
-    $('noteInput').addEventListener('blur', saveCurrentRecord);
+    $('saveRecordBtn').addEventListener('click', saveAndCloseDayEditSheet);
+    $('dayEditClose').addEventListener('click', closeDayEditSheet);
+    $('dayEditBackdrop').addEventListener('click', closeDayEditSheet);
 
     // Delete record
     $('deleteRecordBtn').addEventListener('click', deleteCurrentRecord);

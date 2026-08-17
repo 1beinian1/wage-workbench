@@ -238,13 +238,12 @@ async function applyImport(parsed) {
 }
 
 /* ===== Missing days detection (C4) ===== */
-async function getMissingDays(days = 3) {
+async function getMissingDays() {
   const today = new Date();
   const missing = [];
 
-  for (let i = 1; i <= days; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+  for (let day = 1; day < today.getDate(); day++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), day);
     const dateStr = formatDateKey(d);
     const record = await getWorkRecord(dateStr);
 

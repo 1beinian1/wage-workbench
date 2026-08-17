@@ -99,12 +99,19 @@
           <div id="calendarBody" class="calendar-body"></div>
         </div>
 
-        <!-- Day edit card (C1) -->
-        <div id="dayEditCard" class="day-edit-card clay-card">
-          <div class="day-edit-header">
-            <h3 id="dayEditDate" class="day-edit-date">8月17日 周一</h3>
-            <span id="dayEditWage" class="day-edit-wage">¥0.00</span>
-          </div>
+        <!-- Day edit sheet (C1) -->
+        <div id="dayEditSheet" class="day-edit-sheet hidden" aria-hidden="true">
+          <div id="dayEditBackdrop" class="day-edit-backdrop"></div>
+          <div class="day-edit-card clay-card" role="dialog" aria-modal="true" aria-labelledby="dayEditDate">
+            <div class="day-edit-header">
+              <h3 id="dayEditDate" class="day-edit-date">8月17日 周一</h3>
+              <div class="day-edit-header-actions">
+                <span id="dayEditWage" class="day-edit-wage">¥0.00</span>
+                <button id="dayEditClose" class="day-edit-close" aria-label="关闭录入">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m18 6-12 12M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
 
           <!-- Hours input -->
           <div class="hours-input-group">
@@ -119,19 +126,10 @@
 
           <!-- Quick hours buttons -->
           <div class="quick-hours">
-            <button class="quick-hour-btn" data-hours="4">4h</button>
-            <button class="quick-hour-btn" data-hours="6">6h</button>
-            <button class="quick-hour-btn" data-hours="8">8h</button>
+            <button class="quick-hour-btn" data-hours="3">3h</button>
+            <button class="quick-hour-btn" data-hours="5">5h</button>
+            <button class="quick-hour-btn" data-hours="7">7h</button>
             <button class="quick-hour-btn" data-hours="0">清空</button>
-          </div>
-
-          <!-- Tags (C1: 加班/调休, pure labels) -->
-          <div class="tags-group">
-            <label class="input-label">标签（可选）</label>
-            <div class="tags-row">
-              <button id="tagOvertime" class="tag-btn" data-tag="加班">加班</button>
-              <button id="tagCompoff" class="tag-btn" data-tag="调休">调休</button>
-            </div>
           </div>
 
           <!-- Rest toggle -->
@@ -142,17 +140,14 @@
             </button>
           </div>
 
-          <!-- Note -->
-          <div class="note-group">
-            <label class="input-label" for="noteInput">备注（可选）</label>
-            <input id="noteInput" type="text" maxlength="100" placeholder="加点备注…" class="clay-input note-input">
-          </div>
+          <button id="saveRecordBtn" class="save-record-btn clay-btn-primary">保存</button>
 
           <!-- Delete -->
           <button id="deleteRecordBtn" class="delete-btn hidden">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             删除此日记录
           </button>
+        </div>
         </div>
       </section>
 
